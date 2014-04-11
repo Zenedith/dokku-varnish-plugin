@@ -1,0 +1,7 @@
+.*.swp
+.idea
+*.iml
+*.iws
+*.ipr
+.vagrant
+.DS_Store
