@@ -3,17 +3,24 @@
 set -e;
 
 APP="$1"
+APP_PORT=$(docker port d4d5f5b35856 5000 | sed 's/0.0.0.0://')
+LOCAL_IP="172.17.42.1"
 
-PG_APP_IMAGE="varnish/$APP"
+VARNISH_IMAGE="varnish/$APP"
+VARNISH_DIR="$DOKKU_ROOT/.varnish"
+VARNISH_PORT=8080
 
-# Check if an existing DB volume exists
-PG_APP_IMAGE_ID=$(docker images | grep "$PG_APP_IMAGE" | awk '{print $3}')
-if [[ -n $PG_APP_IMAGE_ID ]]; then
+VOLUME_PROPERTY="$VARNISH_DIR/volume_$APP"
+PORT_PROPERTY="$VARNISH_DIR/port_$APP"
+
+# Check if an existing varnish volume exists
+VARNISH_IMAGE_ID=$(docker images | grep "$VARNISH_IMAGE" | awk '{print $3}')
+if [[ -n $VARNISH_IMAGE_ID ]]; then
   echo "-----> Checking status of Varnish"
 
-  # Check if DB container is installed
-  PG_IMAGE=$(docker images | grep "zenedith/varnish " | awk '{print $3}')
-  if [[ -z $PG_IMAGE ]]; then
+  # Check if varnish container is installed
+  IMAGE=$(docker images | grep "zenedith/varnish " | awk '{print $3}')
+  if [[ -z $IMAGE ]]; then
     echo "Varnish image not found... Did you run 'dokku plugins-install' ?"
     exit 1
   fi
@@ -21,18 +28,19 @@ if [[ -n $PG_APP_IMAGE_ID ]]; then
   echo    "       Found image varnish/$APP varnish instance"
   echo -n "       Checking status... "
 
-  PG_APP_CONTAINER_ID=$(docker ps | grep "$PG_APP_IMAGE" | awk '{print $1}')
-  if [[ -n $PG_APP_CONTAINER_ID ]]; then
+  VARNISH_CONTAINER=$(docker ps | grep "$VARNISH_IMAGE" | awk '{print $1}')
+  if [[ -n $VARNISH_CONTAINER ]]; then
     echo "ok."
   else
     echo "stopped."
 
-    PG_VOLUME="`cat $DOKKU_ROOT/.varnish/volume_$APP`:/opt/varnish"
-    PG_PORT="`cat $DOKKU_ROOT/.varnish/port_$APP`"
+    VOLUME="`cat $VOLUME_PROPERTY`:/opt/varnish"
+    PORT="`cat $PORT_PROPERTY`"
 
-    echo -n "       Launching $PG_APP_IMAGE... "
-    echo "COMMAND: docker run -v $PG_VOLUME -p 5432:$PG_PORT -d $PG_APP_IMAGE /usr/bin/start_pgsql.sh $DB_PASSWORD"
-    ID=$(docker run -v $PG_VOLUME -p $PG_PORT:5432 -d $PG_APP_IMAGE /usr/bin/start_pgsql.sh $DB_PASSWORD)
+    # Launch container
+    echo -n "       Launching $VARNISH_IMAGE... "
+    echo "COMMAND: docker run -e BACKEND_PORT_${APP_PORT}_TCP_ADDR=$LOCAL_IP -e BACKEND_ENV_PORT=$APP_PORT -v $VOLUME -p $VARNISH_PORT:$PORT -d $VARNISH_IMAGE /bin/run.sh"
+    ID=$(docker run -e BACKEND_PORT_${APP_PORT}_TCP_ADDR=$LOCAL_IP -e BACKEND_ENV_PORT=$APP_PORT -v $VOLUME -p $VARNISH_PORT:$PORT -d $VARNISH_IMAGE /bin/run.sh)
     sleep 1
     echo "ok."
   fi
