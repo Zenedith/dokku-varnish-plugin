@@ -1,0 +1,10 @@
+#!/bin/bash
+
+# Build docker varnish image
+# docker build github.com/Zenedith/docker-varnish
+
+# DEBUG
+git clone https://github.com/Zenedith/docker-varnish /tmp/docker-varnish
+git checkout skip-auto-run-varnish-and-get-vcl-file-from-env
+docker build -t zenedith/varnish /tmp/docker-varnish
+rm -rf /tmp/docker-varnish
