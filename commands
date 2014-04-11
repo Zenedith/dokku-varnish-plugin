@@ -74,7 +74,7 @@ case "$1" in
     # Launch container
     # docker run -d -e BACKEND_PORT_80_TCP_ADDR=example.com -e BACKEND_ENV_PORT=80 -p 8080:80 zenedith/varnish
 
-    ID=$(docker run -v $VOLUME -p $VARNISH_PORT -d $VARNISH_IMAGE /usr/bin/start_pgsql.sh $DB_PASSWORD)
+    ID=$(docker run -v $VOLUME -p $VARNISH_PORT -d $VARNISH_IMAGE /bin/run.sh)
     sleep 4
 
     # Rename persistent volume
