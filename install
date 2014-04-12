@@ -1,0 +1,4 @@
+#!/bin/bash
+
+# Build docker varnish image
+docker build github.com/Zenedith/docker-varnish

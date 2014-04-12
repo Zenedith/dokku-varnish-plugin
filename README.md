@@ -19,6 +19,122 @@ dokku plugins-install
 ```
 
 
+Commands
+--------
+```
+$ dokku help
+    varnish:create <app>                            Create a varnish container
+    varnish:delete <app>                            Delete specified varnish container
+    varnish:info <app>                              Display varnish instance informations
+    varnish:list                                    Display list of varnish containers
+    varnish:logs <app>                              Display last logs from varnish container
+```
+
+Simple usage
+------------
+
+Create a new varnish instance:
+
+```bash
+$ dokku varnish:create project
+```
+
+```
+-----> Check app name: project
+-----> Check varnish dir
+
+-----> Create varnish instance for project
+-----> Check app name: project
+-----> Check varnish dir
+
+-----> Varnish info for project
+-----> Check varnish project
+
+       Host: 172.17.42.1
+       Port: 49174
+
+       Backend IP: 172.17.42.1
+       Backend Port: 49159
+```
+
+Deploy your app with the same name
+
+```bash
+$ git remote add dokku git@server:foo
+$ git push dokku master
+```
+
+
+Advanced usage
+--------------
+
+Deleting varnish instance:
+
+```bash
+$ dokku varnish:delete project
+```
+
+```
+-----> Check app name: project
+-----> Check varnish dir
+
+-----> Delete varnish for project
+-----> Restore nginx server port to 49159
+```
+
+Varnish logs (per database):
+
+```bash
+$ dokku varnish:logs project
+```
+
+```
+-----> Check app name: project
+-----> Check varnish dir
+
+-----> Varnish logs for project
+child (23) Started
+Child (23) said Child starts
+Child (23) said SMF.s0 mmap'ed 26214400 bytes of 26214400
+```
+
+Varnish informations:
+
+```bash
+$ dokku varnish:info project
+```
+
+```
+-----> Check app name: project
+-----> Check varnish dir
+
+-----> Varnish info for project
+-----> Check varnish project
+
+       Host: 172.17.42.1
+       Port: 49173
+
+       Backend IP: 172.17.42.1
+       Backend Port: 49159
+```
+
+List of varnish containers:
+
+```bash
+$ dokku varnish:list
+```
+
+```
+-----> Check app name:
+
+-----> List varnish instances
+-----> Check varnish dir
+-----> Varnish containers:
+  - project
+```
+
+
+
 MIT License
 -------
 

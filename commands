@@ -1,0 +1,37 @@
+#!/bin/bash
+
+set -eo pipefail; [[ $DOKKU_TRACE ]] && set -x
+
+# load common functions
+. $(dirname "$0")/functions
+
+check_required_params $1 $2
+init_vars
+
+case "$COMMAND" in
+
+  varnish:create)
+    varnish_create
+  ;;
+
+  varnish:delete)
+    varnish_delete
+  ;;
+
+  varnish:info)
+    varnish_info
+  ;;
+
+  varnish:logs)
+    varnish_logs
+  ;;
+
+  varnish:list)
+    varnish_list
+  ;;
+
+  help)
+    cat && cat < print_help
+  ;;
+
+esac
