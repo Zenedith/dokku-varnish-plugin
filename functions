@@ -34,7 +34,10 @@ function info() {
 
 function debug() {
   local msg="$1"
-  echo "---------> $msg"
+
+  if [ ! -z "$DEBUG" ];then
+    echo "---------> $msg"
+  fi
 }
 
 function check_varnish_container() {

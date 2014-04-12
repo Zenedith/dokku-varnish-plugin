@@ -23,85 +23,117 @@ Commands
 --------
 ```
 $ dokku help
-    varnish:create <app>                            Create a Varnish container
-    varnish:delete <app>                            Delete specified Varnish container
+    varnish:create <app>                            Create a varnish container
+    varnish:delete <app>                            Delete specified varnish container
     varnish:info <app>                              Display varnish instance informations
-    varnish:list                                    Display list of Varnish containers
-    varnish:logs <app>                              Display last logs from Varnish container
+    varnish:list                                    Display list of varnish containers
+    varnish:logs <app>                              Display last logs from varnish container
 ```
 
 Simple usage
 ------------
 
-Create a new DB:
-```
-$ dokku varnish:create foo            # Server side
-$ ssh dokku@server varnish:create foo # Client side
+Create a new varnish instance:
 
------> Varnish container created: varnish/foo
+```bash
+$ dokku varnish:create project
+```
+
+```
+-----> Check app name: project
+-----> Check varnish dir
+
+-----> Create varnish instance for project
+-----> Check app name: project
+-----> Check varnish dir
+
+-----> Varnish info for project
+-----> Check varnish project
 
        Host: 172.17.42.1
-       User: 'root'
-       Password: 'RDSBYlUrOYMtndKb'
-       Database: 'db'
-       Public port: 49187
+       Port: 49174
+
+       Backend IP: 172.17.42.1
+       Backend Port: 49159
 ```
 
-Deploy your app with the same name (client side):
-```
+Deploy your app with the same name
+
+```bash
 $ git remote add dokku git@server:foo
 $ git push dokku master
-
-```
-
-Link your app to the database
-```bash
-dokku varnish:link app_name database_name
 ```
 
 
 Advanced usage
 --------------
 
-Inititalize the database with SQL statements:
-```
-cat init.sql | dokku varnish:create foo
+Deleting varnish instance:
+
+```bash
+$ dokku varnish:delete project
 ```
 
-Deleting databases:
 ```
-dokku varnish:delete foo
-```
+-----> Check app name: project
+-----> Check varnish dir
 
-Linking an app to a specific database:
-```
-dokku varnish:link foo bar
+-----> Delete varnish for project
+-----> Restore nginx server port to 49159
 ```
 
 Varnish logs (per database):
-```
-dokku varnish:logs foo
+
+```bash
+$ dokku varnish:logs project
 ```
 
-Database informations:
 ```
-dokku varnish:info foo
+-----> Check app name: project
+-----> Check varnish dir
+
+-----> Varnish logs for project
+child (23) Started
+Child (23) said Child starts
+Child (23) said SMF.s0 mmap'ed 26214400 bytes of 26214400
 ```
 
-List of containers:
-```
-dokku varnish:list
+Varnish informations:
+
+```bash
+$ dokku varnish:info project
 ```
 
-Dump a database:
 ```
-dokku varnish:dump foo > foo.sql
+-----> Check app name: project
+-----> Check varnish dir
+
+-----> Varnish info for project
+-----> Check varnish project
+
+       Host: 172.17.42.1
+       Port: 49173
+
+       Backend IP: 172.17.42.1
+       Backend Port: 49159
 ```
 
-Restore a database:
+List of varnish containers:
+
 ```
-dokku varnish:restore foo < foo.sql
+$ dokku varnish:list
 ```
+
+```
+-----> Check app name:
+
+-----> List varnish instances
+-----> Check varnish dir
+-----> Varnish containers:
+  - project
+```
+
+
 
 MIT License
 -------
