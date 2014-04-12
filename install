@@ -1,6 +1,5 @@
 #!/bin/bash
 
-export VARNISH_SKIP_AUTO_START=true
 # Build docker varnish image
 # docker build github.com/Zenedith/docker-varnish
 
@@ -11,5 +10,3 @@ git checkout skip-auto-run-varnish-and-get-vcl-file-from-env
 docker build -t zenedith/varnish /tmp/docker-varnish
 cd -
 rm -rf /tmp/docker-varnish
-
-export VARNISH_SKIP_AUTO_START

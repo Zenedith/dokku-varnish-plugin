@@ -3,12 +3,13 @@
 set -e;
 
 APP="$1"
-APP_PORT=$(docker port d4d5f5b35856 5000 | sed 's/0.0.0.0://')
+APP_CONTAINER=$(docker ps | grep "dokku/$APP" | awk '{print $1}')
+APP_PORT=$(docker port $APP_CONTAINER 5000 | sed 's/0.0.0.0://')
 LOCAL_IP="172.17.42.1"
 
 VARNISH_IMAGE="varnish/$APP"
 VARNISH_DIR="$DOKKU_ROOT/.varnish"
-VARNISH_PORT=8080
+VARNISH_PORT=80
 
 VOLUME_PROPERTY="$VARNISH_DIR/volume_$APP"
 PORT_PROPERTY="$VARNISH_DIR/port_$APP"
@@ -39,8 +40,8 @@ if [[ -n $VARNISH_IMAGE_ID ]]; then
 
     # Launch container
     echo -n "       Launching $VARNISH_IMAGE... "
-    echo "COMMAND: docker run -e BACKEND_PORT_${APP_PORT}_TCP_ADDR=$LOCAL_IP -e BACKEND_ENV_PORT=$APP_PORT -v $VOLUME -p $VARNISH_PORT:$PORT -d $VARNISH_IMAGE /bin/run.sh"
-    ID=$(docker run -e BACKEND_PORT_${APP_PORT}_TCP_ADDR=$LOCAL_IP -e BACKEND_ENV_PORT=$APP_PORT -v $VOLUME -p $VARNISH_PORT:$PORT -d $VARNISH_IMAGE /bin/run.sh)
+    echo "COMMAND: docker run -e BACKEND_PORT_${APP_PORT}_TCP_ADDR=$LOCAL_IP -e BACKEND_ENV_PORT=$APP_PORT -v $VOLUME -p $PORT:$VARNISH_PORT -d $VARNISH_IMAGE /bin/run.sh"
+    ID=$(docker run -e BACKEND_PORT_${APP_PORT}_TCP_ADDR=$LOCAL_IP -e BACKEND_ENV_PORT=$APP_PORT -v $VOLUME -p $PORT:$VARNISH_PORT -d $VARNISH_IMAGE /bin/run.sh)
     sleep 1
     echo "ok."
   fi

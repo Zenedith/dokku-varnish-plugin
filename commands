@@ -21,12 +21,15 @@ fi
 LOCAL_IP="172.17.42.1"
 VARNISH_IMAGE="varnish/$APP"
 VARNISH_DIR="$DOKKU_ROOT/.varnish"
-VARNISH_PORT=8080
+VARNISH_PORT=80
 
 VOLUME_PROPERTY="$VARNISH_DIR/volume_$APP"
 PORT_PROPERTY="$VARNISH_DIR/port_$APP"
 
 TELNET_PORT_PROPERTY="$VARNISH_DIR/telnet_port_$APP"
+
+APP_CONTAINER=$(docker ps | grep "dokku/$APP" | awk '{print $1}')
+APP_PORT=$(docker port $APP_CONTAINER 5000 | sed 's/0.0.0.0://')
 
 #APP_VCL_DIR="$DOKKU_ROOT/$APP/vcl"
 
@@ -53,7 +56,7 @@ function check_varnish_container() {
 case "$1" in
 
   varnish:create)
-    # Check if varnish container is installed
+  # Check if varnish container is installed
     IMAGE=$(docker images | grep "zenedith/varnish " | awk '{print $3}')
     if [[ -z $IMAGE ]]; then
       echo "Varnish image not found... Did you run 'dokku plugins-install' ?"
@@ -76,7 +79,6 @@ case "$1" in
     docker tag $IMAGE $VARNISH_IMAGE
 
     # Launch container
-    APP_PORT=$(docker port d4d5f5b35856 5000 | sed 's/0.0.0.0://')
     ID=$(docker run -e BACKEND_PORT_${APP_PORT}_TCP_ADDR=$LOCAL_IP -e BACKEND_ENV_PORT=$APP_PORT -v $VOLUME -p $VARNISH_PORT -d $VARNISH_IMAGE /bin/run.sh)
     sleep 4
 
@@ -96,10 +98,21 @@ case "$1" in
     echo
     echo "-----> Varnish container created: $VARNISH_IMAGE"
     sleep 1
+
+    echo "-----> Wait 10 sec for start varnish instance"
+    sleep 10
+
+    echo "-----> Set nginx to use varnish"
+
+    pluginhook post-deploy $APP $PORT
     dokku varnish:info $APP
   ;;
 
   varnish:delete)
+    echo
+    echo "-----> Restore nginx server port to $APP_PORT"
+    pluginhook post-deploy $APP $APP_PORT
+
     ID=$(docker ps -a | grep "$VARNISH_IMAGE":latest | awk '{print $1}')
 
     # Stop and remove the container
@@ -125,7 +138,7 @@ case "$1" in
     if [[ -f "$VOLUME_PROPERTY" ]]; then
       rm -f "$VOLUME_PROPERTY"
     fi
-    echo
+
     echo "-----> Varnish container deleted: $VARNISH_IMAGE"
   ;;
 
@@ -134,8 +147,11 @@ case "$1" in
     PORT=$(cat "$PORT_PROPERTY")
 
     echo
-    echo "       Host: 172.17.42.1"
+    echo "       Host: $LOCAL_IP"
     echo "       Port: $PORT"
+    echo
+    echo "       Backend IP: $LOCAL_IP"
+    echo "       Backend Port: $APP_PORT"
     echo
   ;;
 
@@ -145,7 +161,7 @@ case "$1" in
   ;;
 
   varnish:list)
-    CONTAINERS=$(ls $VARNISH_DIR/volume* 2 > /dev/null | sed -e 's/_/ /' | awk '{print $2}')
+    CONTAINERS=$(ls $VARNISH_DIR/volume* 2> /dev/null | sed -e 's/_/ /' | awk '{print $2}')
     if [[ -z $CONTAINERS ]]; then
       echo "There are no Varnish containers created."
     else
@@ -158,11 +174,11 @@ case "$1" in
 
   help)
     cat && cat << EOF
-    varnish:create <db>                         Create a Varnish container
-    varnish:delete <db>                         Delete specified Varnish container
-    varnish:info <db>                           Display varnish instance informations
-    varnish:list                                Display list of Varnish containers
-    varnish:logs <db>                           Display last logs from Varnish container
+    varnish:create <app>                            Create a Varnish container
+    varnish:delete <app>                            Delete specified Varnish container
+    varnish:info <app>                              Display varnish instance informations
+    varnish:list                                    Display list of Varnish containers
+    varnish:logs <app>                              Display last logs from Varnish container
 EOF
   ;;
 

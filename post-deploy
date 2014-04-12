@@ -5,6 +5,5 @@ set -eo pipefail; [[ $DOKKU_TRACE ]] && set -x
 APP="$1"
 PORT="$2"
 
-#  pluginhook nginx-pre-reload $APP
-#  sudo /etc/init.d/nginx reload > /dev/null
-echo "TODO: post deploy reload varnish!"
+pluginhook nginx-pre-reload $APP $PORT
+sudo /etc/init.d/nginx reload > /dev/null
