@@ -161,11 +161,11 @@ function init_app_vars() {
   VARNISH_THROTTLE_LIMIT=$(dokku config:get $APP VARNISH_THROTTLE_LIMIT)
   set -e
 
-  if [ -z $VARNISH_CACHE_SIZE ]; then
+  if [ -z "$VARNISH_CACHE_SIZE" ]; then
     VARNISH_CACHE_SIZE="25MB"
   fi
 
-  if [ -z $VARNISH_THROTTLE_LIMIT ]; then
+  if [ -z "$VARNISH_THROTTLE_LIMIT" ]; then
     VARNISH_THROTTLE_LIMIT="150req/30s"
   fi
 
