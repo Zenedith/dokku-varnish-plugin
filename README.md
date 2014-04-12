@@ -130,6 +130,11 @@ $ dokku varnish:info project
 
        Backend IP: 172.17.42.1
        Backend Port: 49159
+
+       Cache size: 100MB
+       Throttle limit: 255req/30s
+       Grace ttl: 30s
+       Grace max: 1h
 ```
 
 List of varnish containers:
