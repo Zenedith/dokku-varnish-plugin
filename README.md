@@ -120,7 +120,7 @@ $ dokku varnish:info project
 
 List of varnish containers:
 
-```
+```bash
 $ dokku varnish:list
 ```
 
