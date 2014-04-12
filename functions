@@ -15,6 +15,10 @@ VARNISH_DIR=
 
 VOLUME_PROPERTY=
 PORT_PROPERTY=
+CACHE_SIZE_PROPERTY=
+THROTTLE_LIMIT_PROPERTY=
+GRACE_TTL_PROPERTY=
+GRACE_MAX_PROPERTY=
 VARNISH_CACHE_SIZE=
 VARNISH_THROTTLE_LIMIT=
 VARNISH_GRACE_TTL=
@@ -157,6 +161,10 @@ function init_app_vars() {
   VARNISH_IMAGE="varnish/$APP"
   VOLUME_PROPERTY="$VARNISH_DIR/volume_$APP"
   PORT_PROPERTY="$VARNISH_DIR/port_$APP"
+  CACHE_SIZE_PROPERTY="$VARNISH_DIR/cache_size_$APP"
+  THROTTLE_LIMIT_PROPERTY="$VARNISH_DIR/throttle_limit_$APP"
+  GRACE_TTL_PROPERTY="$VARNISH_DIR/grace_ttl_$APP"
+  GRACE_MAX_PROPERTY="$VARNISH_DIR/grace_max_$APP"
 
   set +e
   VARNISH_CACHE_SIZE=$(dokku config:get $APP VARNISH_CACHE_SIZE)
@@ -167,17 +175,25 @@ function init_app_vars() {
     VARNISH_CACHE_SIZE="25MB"
   fi
 
+  echo $VARNISH_CACHE_SIZE > "$CACHE_SIZE_PROPERTY"
+
   if [ -z "$VARNISH_THROTTLE_LIMIT" ]; then
     VARNISH_THROTTLE_LIMIT="150req/30s"
   fi
+
+  echo $VARNISH_THROTTLE_LIMIT > "$THROTTLE_LIMIT_PROPERTY"
 
   if [ -z "$VARNISH_GRACE_TTL" ]; then
     VARNISH_GRACE_TTL="30s"
   fi
 
+  echo $VARNISH_GRACE_TTL > "$GRACE_TTL_PROPERTY"
+
   if [ -z "$VARNISH_GRACE_MAX" ]; then
     VARNISH_GRACE_MAX="1h"
   fi
+
+  echo $VARNISH_GRACE_MAX > "$GRACE_MAX_PROPERTY"
 
   APP_CONTAINER=$(docker ps | grep "dokku/$APP" | awk '{print $1}')
   APP_PORT=$(docker port $APP_CONTAINER 5000 | sed 's/0.0.0.0://')
@@ -247,15 +263,23 @@ function varnish_info() {
   echo
   info "Varnish info for $APP"
   check_varnish_container
-  PORT=$(cat "$PORT_PROPERTY")
+  local port=$(cat "$PORT_PROPERTY")
+  local cache_size=$(cat "$CACHE_SIZE_PROPERTY")
+  local throttle_limit=$(cat "$THROTTLE_LIMIT_PROPERTY")
+  local grace_ttl=$(cat "$GRACE_TTL_PROPERTY")
+  local grace_max=$(cat "$GRACE_MAX_PROPERTY")
 
   echo
   echo "       Host: $LOCAL_IP"
-  echo "       Port: $PORT"
+  echo "       Port: $port"
   echo
   echo "       Backend IP: $LOCAL_IP"
   echo "       Backend Port: $APP_PORT"
   echo
+  echo "       Cache size: $cache_size"
+  echo "       Throttle limit: $throttle_limit"
+  echo "       Grace ttl: $grace_ttl"
+  echo "       Grace max: $grace_max"
 }
 
 function varnish_logs() {
@@ -310,6 +334,26 @@ function varnish_delete() {
   # Remove persistent volume
   if [[ -f "$VOLUME_PROPERTY" ]]; then
     rm -f "$VOLUME_PROPERTY"
+  fi
+
+  # Remove cache size property
+  if [[ -f "$CACHE_SIZE_PROPERTY" ]]; then
+    rm -f "$CACHE_SIZE_PROPERTY"
+  fi
+
+  # Remove throttle limit property
+  if [[ -f "$THROTTLE_LIMIT_PROPERTY" ]]; then
+    rm -f "$THROTTLE_LIMIT_PROPERTY"
+  fi
+
+  # Remove grace ttl property
+  if [[ -f "$GRACE_TTL_PROPERTY" ]]; then
+    rm -f "$GRACE_TTL_PROPERTY"
+  fi
+
+  # Remove grace max property
+  if [[ -f "$GRACE_MAX_PROPERTY" ]]; then
+    rm -f "$GRACE_MAX_PROPERTY"
   fi
 
   debug "Varnish container deleted: $VARNISH_IMAGE"
