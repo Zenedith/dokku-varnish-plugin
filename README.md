@@ -33,6 +33,15 @@ $ dokku help
 Simple usage
 ------------
 
+Set custom configuration for varnish
+
+```bash
+$ dokku config:set project VARNISH_GRACE_TTL=30s
+$ dokku config:set project VARNISH_GRACE_MAX=1h
+$ dokku config:set project VARNISH_CACHE_SIZE=100MB
+$ dokku config:set project VARNISH_THROTTLE_LIMIT=255req/30s
+```
+
 Create a new varnish instance:
 
 ```bash
@@ -55,6 +64,11 @@ $ dokku varnish:create project
 
        Backend IP: 172.17.42.1
        Backend Port: 49159
+
+       Cache size: 100MB
+       Throttle limit: 255req/30s
+       Grace ttl: 30s
+       Grace max: 1h
 ```
 
 Deploy your app with the same name
