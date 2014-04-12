@@ -31,7 +31,7 @@ case "$COMMAND" in
   ;;
 
   help)
-    cat && cat < print_help
+    cat && cat | print_help
   ;;
 
 esac
