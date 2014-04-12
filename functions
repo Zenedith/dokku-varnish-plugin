@@ -213,7 +213,7 @@ function varnish_create() {
   info "Create varnish instance for $APP"
 
   # Check if varnish container is installed
-  IMAGE=$(docker images | grep $DOCKER_VARNISH_IMAGE | awk '{print $3}')
+  IMAGE=$(docker images | grep "$DOCKER_VARNISH_IMAGE" | awk '{print $3}')
   check_varnish_image $IMAGE
 
   # Check if an existing varnish volume exists
@@ -225,7 +225,7 @@ function varnish_create() {
   fi
 
   # Fork varnish image
-  ID=$(docker run -d $DOCKER_VARNISH_IMAGE exit 0)
+  ID=$(docker run -d "$DOCKER_VARNISH_IMAGE" exit 0)
   docker wait $ID > /dev/null
   IMAGE=$(docker commit $ID)
   docker tag $IMAGE $VARNISH_IMAGE
