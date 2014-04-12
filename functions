@@ -103,11 +103,6 @@ function check_required_params() {
   local command_param="$1"
   local app_name_param="$2"
 
-  if [ -z $command_param ]; then
-    print_help
-    failure "You must specify valid command"
-  fi
-
   COMMAND="$command_param"
   debug "set COMMAND to $COMMAND"
 
