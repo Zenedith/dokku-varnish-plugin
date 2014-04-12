@@ -1,0 +1,304 @@
+#!/bin/bash
+
+set -eo pipefail; [[ $DOKKU_TRACE ]] && set -x
+
+# Const variables
+LOCAL_IP="172.17.42.1"
+DOCKER_VARNISH_IMAGE="zenedith/varnish"
+VARNISH_PORT=80
+
+COMMAND=
+APP=
+
+VARNISH_IMAGE=
+VARNISH_DIR=
+
+VOLUME_PROPERTY=
+PORT_PROPERTY=
+VARNISH_CACHE_SIZE=
+VARNISH_THROTTLE_LIMIT=
+
+APP_CONTAINER=
+APP_PORT=
+
+function failure() {
+  local msg="$1"
+  echo "FAILURE: $msg"
+  exit 1
+}
+
+function info() {
+  local msg="$1"
+  echo "-----> $msg"
+}
+
+function debug() {
+  local msg="$1"
+  echo "---------> $msg"
+}
+
+function check_varnish_container() {
+  info "Check varnish container"
+
+  if [[ ! -f "$PORT_PROPERTY" ]]; then
+    failure "Unknown varnish container"
+  fi
+}
+
+function check_varnish_dir() {
+  info "Check varnish dir"
+
+  if [ -z $VARNISH_DIR ]; then
+    failure "Call init_common_vars first (VARNISH_DIR not set)"
+  fi
+
+  if [ ! -d $VARNISH_DIR ]; then
+    mkdir -p $VARNISH_DIR
+    chown -R dokku: $VARNISH_DIR
+    debug "Created $VARNISH_DIR"
+  else
+    debug "$VARNISH_DIR exists"
+  fi
+}
+
+function print_help() {
+  cat << EOF
+    varnish:create <app>                            Create a Varnish container
+    varnish:delete <app>                            Delete specified Varnish container
+    varnish:info <app>                              Display varnish instance informations
+    varnish:list                                    Display list of Varnish containers
+    varnish:logs <app>                              Display last logs from Varnish container
+EOF
+}
+
+function check_app_name() {
+  local app_name_param="$1"
+  info "Check app name: $app_name_param"
+
+  if [ ! -d "$DOKKU_ROOT/$app_name_param" ]; then
+    failure "Invalid application name: \"$app_name_param\""
+  fi
+}
+
+function check_varnish_image() {
+  debug "Check varnish image"
+  local image="$1"
+
+  if [[ -z $image ]]; then
+    failure "Varnish image not found... Did you run 'dokku plugins-install' ?"
+  fi
+}
+
+function check_required_params() {
+  debug "Check required params"
+  local command_param="$1"
+  local app_name_param="$2"
+
+  local invalid_command="true"
+
+  for command in "help" "varnish:create" "varnish:delete" "varnish:info" "varnish:list" "varnish:logs"
+  do
+    if [ "$command_param" == "$command" ]; then
+      invalid_command="false"
+      break
+    fi
+  done
+
+  if [ -z $command_param ] || [ "$invalid_command" == "true" ]; then
+    print_help
+    failure "You must specify valid command"
+  fi
+
+  COMMAND="$command_param"
+  debug "set COMMAND to $COMMAND"
+
+  if [[ $command_param == varnish:* ]]; then
+    if [ -z $app_name_param ] && [ $command_param != varnish:list ]; then
+      failure "You must specify an app name for commmand: $command_param"
+    else
+      check_app_name $app_name_param
+
+      APP="$app_name_param"
+      debug "set APP to $APP"
+    fi
+  fi
+}
+
+function init_vars() {
+  debug "Init vars"
+
+  if [ -z $APP ]; then
+    init_common_vars
+  else
+    init_app_vars
+  fi
+}
+
+function init_common_vars() {
+  debug "Init common vars"
+  VARNISH_DIR="$DOKKU_ROOT/.varnish"
+  debug "set VARNISH_DIR to $VARNISH_DIR"
+}
+
+function init_app_vars() {
+  debug "Init app vars"
+  init_common_vars
+  check_varnish_dir
+
+  if [ -z $APP ]; then
+    failure "Call check_required_params first (APP not set)"
+  fi
+
+  VARNISH_IMAGE="varnish/$APP"
+  VOLUME_PROPERTY="$VARNISH_DIR/volume_$APP"
+  PORT_PROPERTY="$VARNISH_DIR/port_$APP"
+
+  set +e
+  VARNISH_CACHE_SIZE=$(dokku config:get $APP VARNISH_CACHE_SIZE)
+  VARNISH_THROTTLE_LIMIT=$(dokku config:get $APP VARNISH_THROTTLE_LIMIT)
+  set -e
+
+  if [ -z $VARNISH_CACHE_SIZE ]; then
+    VARNISH_CACHE_SIZE="25MB"
+  fi
+
+  if [ -z $VARNISH_THROTTLE_LIMIT ]; then
+    VARNISH_THROTTLE_LIMIT="150req/30s"
+  fi
+
+  set +e
+  APP_CONTAINER=$(docker ps | grep "dokku/$APP" | awk '{print $1}')
+  APP_PORT=$(docker port $APP_CONTAINER 5000 | sed 's/0.0.0.0://')
+  set -e
+
+  if [ -z $APP_CONTAINER ]; then
+    failure "Can't find application \"dokku/$APP\" container"
+  fi
+
+  if [ -z $APP_PORT ]; then
+    failure "Can't find NAT port for application \"dokku/$APP\" on port 5000"
+  fi
+}
+
+
+function varnish_create() {
+  echo
+  info "Create varnish instance for $APP"
+
+  # Check if varnish container is installed
+  IMAGE=$(docker images | grep $DOCKER_VARNISH_IMAGE | awk '{print $3}')
+  check_varnish_image $IMAGE
+
+  # Check if an existing varnish volume exists
+  if [[ -f "$VOLUME_PROPERTY" ]]; then
+    VOLUME="`cat $VOLUME_PROPERTY`:/opt/varnish"
+    debug "Reusing varnish/$APP varnish instance"
+  else
+    VOLUME="/opt/varnish"
+  fi
+
+  # Fork varnish image
+  ID=$(docker run -d $DOCKER_VARNISH_IMAGE exit 0)
+  docker wait $ID > /dev/null
+  IMAGE=$(docker commit $ID)
+  docker tag $IMAGE $VARNISH_IMAGE
+
+  # Launch container
+  ID=$(docker run -e BACKEND_PORT_${APP_PORT}_TCP_ADDR=$LOCAL_IP -e BACKEND_ENV_PORT=$APP_PORT -v $VOLUME -p $VARNISH_PORT -d $VARNISH_IMAGE /bin/run.sh)
+  sleep 4
+
+  # Rename persistent volume
+  if [[ ! -f "$VOLUME_PROPERTY" ]]; then
+    VOLUME_PATH=$(docker inspect $ID | grep /var/lib/docker/vfs/dir/ | awk '{print $2}' | sed -e's/"//g')
+    if [[ -z $VOLUME_PATH ]]; then
+      failure "Your docker version is too old, please update it"
+    fi
+    echo $VOLUME_PATH > "$VOLUME_PROPERTY"
+  fi
+  # Write port for further usage
+  PORT=$(docker port $ID $VARNISH_PORT | sed 's/0.0.0.0://')
+  echo $PORT > "$PORT_PROPERTY"
+
+  debug "Varnish container created: $VARNISH_IMAGE"
+  sleep 1
+
+  debug "Wait 10 sec for start varnish instance"
+  sleep 10
+
+  debug "Set nginx to use varnish"
+
+  pluginhook post-deploy $APP $PORT
+  dokku varnish:info $APP
+}
+
+function varnish_info() {
+  echo
+  info "Varnish info for $APP"
+  check_varnish_container
+  PORT=$(cat "$PORT_PROPERTY")
+
+  echo
+  echo "       Host: $LOCAL_IP"
+  echo "       Port: $PORT"
+  echo
+  echo "       Backend IP: $LOCAL_IP"
+  echo "       Backend Port: $APP_PORT"
+  echo
+}
+
+function varnish_logs() {
+  echo
+  info "Varnish logs for $APP"
+  ID=$(docker ps -a | grep "$VARNISH_IMAGE" | awk '{print $1}')
+  docker logs $ID | tail -n 100
+}
+
+function varnish_list() {
+  echo
+  info "List varnish instances"
+  check_varnish_dir
+  CONTAINERS=$(ls $VARNISH_DIR/volume* 2> /dev/null | sed -e 's/_/ /' | awk '{print $2}')
+  if [[ -z $CONTAINERS ]]; then
+    failure "There are no Varnish containers created."
+  else
+    info "Varnish containers:"
+    for CONTAINER in $CONTAINERS; do
+      echo "  - $CONTAINER"
+    done
+  fi
+}
+
+function varnish_delete() {
+  echo
+  info "Delete varnish for $APP"
+  info "Restore nginx server port to $APP_PORT"
+  pluginhook post-deploy $APP $APP_PORT
+
+  ID=$(docker ps -a | grep "$VARNISH_IMAGE":latest | awk '{print $1}')
+
+  # Stop and remove the container
+  if [[ ! -z $ID ]]; then
+    docker kill $ID > /dev/null
+    sleep 1
+    docker rm -v $ID > /dev/null
+    sleep 1
+  fi
+
+  # Remove image
+  IMAGE=$(docker images | grep "$VARNISH_IMAGE" | awk '{print $1}')
+  if [[ ! -z $IMAGE ]]; then
+    docker rmi $IMAGE > /dev/null
+  fi
+
+  # Remove container port storage
+  if [[ -f "$PORT_PROPERTY" ]]; then
+    rm -f "$PORT_PROPERTY"
+  fi
+
+  # Remove persistent volume
+  if [[ -f "$VOLUME_PROPERTY" ]]; then
+    rm -f "$VOLUME_PROPERTY"
+  fi
+
+  debug "Varnish container deleted: $VARNISH_IMAGE"
+}

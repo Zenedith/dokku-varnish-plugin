@@ -19,6 +19,90 @@ dokku plugins-install
 ```
 
 
+Commands
+--------
+```
+$ dokku help
+    varnish:create <app>                            Create a Varnish container
+    varnish:delete <app>                            Delete specified Varnish container
+    varnish:info <app>                              Display varnish instance informations
+    varnish:list                                    Display list of Varnish containers
+    varnish:logs <app>                              Display last logs from Varnish container
+```
+
+Simple usage
+------------
+
+Create a new DB:
+```
+$ dokku varnish:create foo            # Server side
+$ ssh dokku@server varnish:create foo # Client side
+
+-----> Varnish container created: varnish/foo
+
+       Host: 172.17.42.1
+       User: 'root'
+       Password: 'RDSBYlUrOYMtndKb'
+       Database: 'db'
+       Public port: 49187
+```
+
+Deploy your app with the same name (client side):
+```
+$ git remote add dokku git@server:foo
+$ git push dokku master
+
+```
+
+Link your app to the database
+```bash
+dokku varnish:link app_name database_name
+```
+
+
+Advanced usage
+--------------
+
+Inititalize the database with SQL statements:
+```
+cat init.sql | dokku varnish:create foo
+```
+
+Deleting databases:
+```
+dokku varnish:delete foo
+```
+
+Linking an app to a specific database:
+```
+dokku varnish:link foo bar
+```
+
+Varnish logs (per database):
+```
+dokku varnish:logs foo
+```
+
+Database informations:
+```
+dokku varnish:info foo
+```
+
+List of containers:
+```
+dokku varnish:list
+```
+
+Dump a database:
+```
+dokku varnish:dump foo > foo.sql
+```
+
+Restore a database:
+```
+dokku varnish:restore foo < foo.sql
+```
+
 MIT License
 -------
 
