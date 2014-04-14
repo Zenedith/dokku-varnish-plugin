@@ -9,7 +9,7 @@ check_app_name $1
 APP="$1"
 PORT="$2"
 
-info "Varnish pre-deploy for $APP"
+info "Varnish post-deploy for $APP"
 
 init_vars
 
