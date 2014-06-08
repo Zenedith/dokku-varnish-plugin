@@ -7,8 +7,8 @@ Project: https://github.com/progrium/dokku
 
 Requirements
 ------------
-* Docker version `0.7.2` or higher
-* Dokku version `0.2.1` or higher
+* Docker version `0.9.0` or higher
+* Dokku version `0.2.3` or higher
 
 Installation
 ------------
