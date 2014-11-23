@@ -82,7 +82,7 @@ EOF
 
 function check_app_name() {
   local app_name_param="$1"
-  info "Check app name: $app_name_param"
+  debug "Check app name: $app_name_param"
 
   if [ ! -d "$DOKKU_ROOT/$app_name_param" ]; then
     failure "Invalid application name: \"$app_name_param\""
@@ -201,7 +201,7 @@ function varnish_create() {
 
   # Check if varnish container is installed
   IMAGE=$(docker images | grep "$DOCKER_VARNISH_IMAGE" | awk '{print $3}')
-  check_varnish_image $IMAGE
+  check_varnish_image "$IMAGE"
 
   # Check if an existing varnish volume exists
   if [[ -f "$VOLUME_PROPERTY" ]]; then
@@ -209,10 +209,11 @@ function varnish_create() {
     debug "Reusing varnish/$APP varnish instance"
   else
     VOLUME="/opt/varnish"
+    mkdir -p "$VOLUME"
   fi
 
   # Fork varnish image
-  ID=$(docker run -d "$DOCKER_VARNISH_IMAGE" exit 0)
+  ID=$(docker run -d "$DOCKER_VARNISH_IMAGE" `exit 0`)
   docker wait $ID > /dev/null
   IMAGE=$(docker commit $ID)
   docker tag $IMAGE $VARNISH_IMAGE
