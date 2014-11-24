@@ -55,7 +55,7 @@ function check_varnish_container() {
 }
 
 function check_varnish_dir() {
-  info "Check varnish dir"
+  debug "Check varnish dir"
 
   if [ -z $VARNISH_DIR ]; then
     failure "Call init_common_vars first (VARNISH_DIR not set)"
@@ -213,7 +213,7 @@ function varnish_create() {
   fi
 
   # Fork varnish image
-  ID=$(docker run -d "$DOCKER_VARNISH_IMAGE" `exit 0`)
+  ID=$(docker run -d "$DOCKER_VARNISH_IMAGE" `echo ''`)
   docker wait $ID > /dev/null
   IMAGE=$(docker commit $ID)
   docker tag $IMAGE $VARNISH_IMAGE
@@ -271,10 +271,15 @@ function varnish_info() {
   echo "       Grace max: $grace_max"
 }
 
+function get_varnish_id() {
+  ID=$(docker ps -a | grep "$VARNISH_IMAGE":latest | awk '{print $1}')
+  echo $ID
+}
+
 function varnish_logs() {
   echo
   info "Varnish logs for $APP"
-  ID=$(docker ps -a | grep "$VARNISH_IMAGE" | awk '{print $1}')
+  ID=$(get_varnish_id)
   docker logs $ID | tail -n 100
 }
 
@@ -299,7 +304,7 @@ function varnish_delete() {
   info "Restore nginx server port to $APP_PORT"
   pluginhook post-deploy $APP $APP_PORT
 
-  ID=$(docker ps -a | grep "$VARNISH_IMAGE":latest | awk '{print $1}')
+  ID=$(get_varnish_id)
 
   # Stop and remove the container
   if [[ ! -z $ID ]]; then
