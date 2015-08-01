@@ -27,99 +27,80 @@ VARNISH_GRACE_MAX=
 APP_CONTAINER=
 APP_PORT=
 
-function failure() {
-  local msg="$1"
-  echo "FAILURE: $msg"
-  exit 1
-}
-
-function info() {
-  local msg="$1"
-  echo "-----> $msg"
-}
-
-function debug() {
-  local msg="$1"
-
-  if [ ! -z "$DEBUG" ];then
-    echo "---------> $msg"
-  fi
-}
-
 function check_varnish_container() {
-  info "Check varnish container"
+  dokku_log_info1 "Check varnish container"
 
   if [[ ! -f "$PORT_PROPERTY" ]]; then
-    failure "Unknown varnish container"
+    dokku_log_fail "Unknown varnish container"
   fi
 }
 
 function check_varnish_dir() {
-  debug "Check varnish dir"
+  dokku_log_verbose "Check varnish dir"
 
   if [ -z $VARNISH_DIR ]; then
-    failure "Call init_common_vars first (VARNISH_DIR not set)"
+    dokku_log_fail "Call init_common_vars first (VARNISH_DIR not set)"
   fi
 
   if [ ! -d $VARNISH_DIR ]; then
     mkdir -p $VARNISH_DIR
     chown -R dokku: $VARNISH_DIR
-    debug "Created $VARNISH_DIR"
+    dokku_log_verbose "Created $VARNISH_DIR"
   else
-    debug "$VARNISH_DIR exists"
+    dokku_log_verbose "$VARNISH_DIR exists"
   fi
 }
 
 function print_help() {
   cat << EOF
-    varnish:create <app>                            Create a Varnish container
-    varnish:delete <app>                            Delete specified Varnish container
-    varnish:info <app>                              Display varnish instance informations
-    varnish:list                                    Display list of Varnish containers
-    varnish:logs <app>                              Display last logs from Varnish container
+    varnish:create <app>, Create a Varnish container
+    varnish:delete <app>, Delete specified Varnish container
+    varnish:info <app>, Display varnish instance dokku_log_info1rmations
+    varnish:list, Display list of Varnish containers
+    varnish:logs <app>, Display last logs from Varnish container
 EOF
 }
 
 function check_app_name() {
   local app_name_param="$1"
-  debug "Check app name: $app_name_param"
+  dokku_log_verbose "Check app name: $app_name_param"
 
   if [ ! -d "$DOKKU_ROOT/$app_name_param" ]; then
-    failure "Invalid application name: \"$app_name_param\""
+    dokku_log_fail "Invalid application name: \"$app_name_param\""
   fi
 }
 
 function check_varnish_image() {
-  debug "Check varnish image"
+  dokku_log_verbose "Check varnish image"
   local image="$1"
 
   if [[ -z $image ]]; then
-    failure "Varnish image not found... Did you run 'dokku plugins-install' ?"
+    dokku_log_fail "Varnish image not found... Did you run 'dokku plugins-install' ?"
   fi
 }
 
 function check_required_params() {
-  debug "Check required params"
+  dokku_log_verbose "Check required params"
   local command_param="$1"
   local app_name_param="$2"
 
   COMMAND="$command_param"
-  debug "set COMMAND to $COMMAND"
+  dokku_log_verbose "set COMMAND to $COMMAND"
 
   if [[ $command_param == varnish:* ]]; then
     if [ -z $app_name_param ] && [ $command_param != varnish:list ]; then
-      failure "You must specify an app name for commmand: $command_param"
+      dokku_log_fail "You must specify an app name for commmand: $command_param"
     else
       check_app_name $app_name_param
 
       APP="$app_name_param"
-      debug "set APP to $APP"
+      dokku_log_verbose "set APP to $APP"
     fi
   fi
 }
 
 function init_vars() {
-  debug "Init vars"
+  dokku_log_verbose "Init vars"
 
   if [ -z $APP ]; then
     init_common_vars
@@ -129,18 +110,18 @@ function init_vars() {
 }
 
 function init_common_vars() {
-  debug "Init common vars"
+  dokku_log_verbose "Init common vars"
   VARNISH_DIR="$DOKKU_ROOT/.varnish"
-  debug "set VARNISH_DIR to $VARNISH_DIR"
+  dokku_log_verbose "set VARNISH_DIR to $VARNISH_DIR"
 }
 
 function init_app_vars() {
-  debug "Init app vars"
+  dokku_log_verbose "Init app vars"
   init_common_vars
   check_varnish_dir
 
   if [ -z $APP ]; then
-    failure "Call check_required_params first (APP not set)"
+    dokku_log_fail "Call check_required_params first (APP not set)"
   fi
 
   VARNISH_IMAGE="varnish/$APP"
@@ -186,18 +167,18 @@ function init_app_vars() {
   APP_PORT=$(docker port $APP_CONTAINER 5000 | sed 's/0.0.0.0://')
 
   if [ -z $APP_CONTAINER ]; then
-    failure "Can't find application \"dokku/$APP\" container"
+    dokku_log_fail "Can't find application \"dokku/$APP\" container"
   fi
 
   if [ -z $APP_PORT ]; then
-    failure "Can't find NAT port for application \"dokku/$APP\" on port 5000"
+    dokku_log_fail "Can't find NAT port for application \"dokku/$APP\" on port 5000"
   fi
 }
 
 
 function varnish_create() {
   echo
-  info "Create varnish instance for $APP"
+  dokku_log_info1 "Create varnish instance for $APP"
 
   # Check if varnish container is installed
   IMAGE=$(docker images | grep "$DOCKER_VARNISH_IMAGE" | awk '{print $3}')
@@ -206,7 +187,7 @@ function varnish_create() {
   # Check if an existing varnish volume exists
   if [[ -f "$VOLUME_PROPERTY" ]]; then
     VOLUME="`cat $VOLUME_PROPERTY`:/opt/varnish"
-    debug "Reusing varnish/$APP varnish instance"
+    dokku_log_verbose "Reusing varnish/$APP varnish instance"
   else
     VOLUME="/opt/varnish"
     mkdir -p "$VOLUME"
@@ -220,7 +201,7 @@ function varnish_create() {
 
   # Launch container
 
-  debug "Launching $VARNISH_IMAGE: docker run -e CACHE_SIZE=$VARNISH_CACHE_SIZE -e THROTTLE_LIMIT=$VARNISH_THROTTLE_LIMIT -e GRACE_TTL=$VARNISH_GRACE_TTL -e GRACE_MAX=$VARNISH_GRACE_MAX -e BACKEND_PORT_${APP_PORT}_TCP_ADDR=$LOCAL_IP -e BACKEND_ENV_PORT=$APP_PORT -v $VOLUME -p $VARNISH_PORT -d $VARNISH_IMAGE /bin/run.sh"
+  dokku_log_verbose "Launching $VARNISH_IMAGE: docker run -e CACHE_SIZE=$VARNISH_CACHE_SIZE -e THROTTLE_LIMIT=$VARNISH_THROTTLE_LIMIT -e GRACE_TTL=$VARNISH_GRACE_TTL -e GRACE_MAX=$VARNISH_GRACE_MAX -e BACKEND_PORT_${APP_PORT}_TCP_ADDR=$LOCAL_IP -e BACKEND_ENV_PORT=$APP_PORT -v $VOLUME -p $VARNISH_PORT -d $VARNISH_IMAGE /bin/run.sh"
   ID=$(docker run -e CACHE_SIZE=$VARNISH_CACHE_SIZE -e THROTTLE_LIMIT="$VARNISH_THROTTLE_LIMIT" -e GRACE_TTL="$VARNISH_GRACE_TTL" -e GRACE_MAX="$VARNISH_GRACE_MAX" -e BACKEND_PORT_${APP_PORT}_TCP_ADDR=$LOCAL_IP -e BACKEND_ENV_PORT=$APP_PORT -v $VOLUME -p $VARNISH_PORT -d $VARNISH_IMAGE /bin/run.sh)
   sleep 4
 
@@ -228,7 +209,7 @@ function varnish_create() {
   if [[ ! -f "$VOLUME_PROPERTY" ]]; then
     VOLUME_PATH=$(docker inspect $ID | grep /var/lib/docker/vfs/dir/ | awk '{print $2}' | sed -e's/"//g')
     if [[ -z $VOLUME_PATH ]]; then
-      failure "Your docker version is too old, please update it"
+      dokku_log_fail "Your docker version is too old, please update it"
     fi
     echo $VOLUME_PATH > "$VOLUME_PROPERTY"
   fi
@@ -236,13 +217,13 @@ function varnish_create() {
   PORT=$(docker port $ID $VARNISH_PORT | sed 's/0.0.0.0://')
   echo $PORT > "$PORT_PROPERTY"
 
-  debug "Varnish container created: $VARNISH_IMAGE"
+  dokku_log_verbose "Varnish container created: $VARNISH_IMAGE"
   sleep 1
 
-  debug "Wait 10 sec for start varnish instance"
+  dokku_log_verbose "Wait 10 sec for start varnish instance"
   sleep 10
 
-  debug "Set nginx to use varnish"
+  dokku_log_verbose "Set nginx to use varnish"
 
   pluginhook post-deploy $APP $PORT
   dokku varnish:info $APP
@@ -250,7 +231,7 @@ function varnish_create() {
 
 function varnish_info() {
   echo
-  info "Varnish info for $APP"
+  dokku_log_info1 "Varnish dokku_log_info1 for $APP"
   check_varnish_container
   local port=$(cat "$PORT_PROPERTY")
   local cache_size=$(cat "$CACHE_SIZE_PROPERTY")
@@ -278,20 +259,20 @@ function get_varnish_id() {
 
 function varnish_logs() {
   echo
-  info "Varnish logs for $APP"
+  dokku_log_info1 "Varnish logs for $APP"
   ID=$(get_varnish_id)
   docker logs $ID | tail -n 100
 }
 
 function varnish_list() {
   echo
-  info "List varnish instances"
+  dokku_log_info1 "List varnish instances"
   check_varnish_dir
   CONTAINERS=$(ls $VARNISH_DIR/volume* 2> /dev/null | sed -e 's/_/ /' | awk '{print $2}')
   if [[ -z $CONTAINERS ]]; then
-    failure "There are no Varnish containers created."
+    dokku_log_fail "There are no Varnish containers created."
   else
-    info "Varnish containers:"
+    dokku_log_info1 "Varnish containers:"
     for CONTAINER in $CONTAINERS; do
       echo "  - $CONTAINER"
     done
@@ -300,8 +281,8 @@ function varnish_list() {
 
 function varnish_delete() {
   echo
-  info "Delete varnish for $APP"
-  info "Restore nginx server port to $APP_PORT"
+  dokku_log_info1 "Delete varnish for $APP"
+  dokku_log_info1 "Restore nginx server port to $APP_PORT"
   pluginhook post-deploy $APP $APP_PORT
 
   ID=$(get_varnish_id)
@@ -350,5 +331,5 @@ function varnish_delete() {
     rm -f "$GRACE_MAX_PROPERTY"
   fi
 
-  debug "Varnish container deleted: $VARNISH_IMAGE"
+  dokku_log_verbose "Varnish container deleted: $VARNISH_IMAGE"
 }

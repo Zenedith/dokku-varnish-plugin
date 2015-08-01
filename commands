@@ -30,8 +30,11 @@ case "$COMMAND" in
     varnish_list
   ;;
 
-  help)
+  help | varnish:help)
     cat && cat | print_help
   ;;
 
+  *)
+    exit $DOKKU_NOT_IMPLEMENTED_EXIT
+  ;;
 esac
