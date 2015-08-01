@@ -1,45 +1,13 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# Notify an external service that a successful deploy has occurred.
 
 set -eo pipefail; [[ $DOKKU_TRACE ]] && set -x
+source "$(dirname $0)/../../../dokku/plugins/common/functions"
 
-# load common functions
-. $(dirname "$0")/functions
-
-check_app_name $1
 APP="$1"
 PORT="$2"
 
-info "Varnish post-deploy for $APP"
-
-init_vars
-
-# Check if an existing varnish volume exists
-VARNISH_IMAGE_ID=$(docker images | grep "$VARNISH_IMAGE" | awk '{print $3}')
-if [[ -n $VARNISH_IMAGE_ID ]]; then
-  info "Checking status of Varnish"
-
-  # Check if varnish container is installed
-  IMAGE=$(docker images | grep $DOCKER_VARNISH_IMAGE | awk '{print $3}')
-  check_varnish_image $IMAGE
-
-  debug "Found image $VARNISH_IMAGE instance"
-
-  VARNISH_CONTAINER=$(docker ps | grep "$VARNISH_IMAGE" | awk '{print $1}')
-  if [[ -n $VARNISH_CONTAINER ]]; then
-    debug "Checking status... ok."
-  else
-    debug "Checking status... stopped."
-
-    volume="`cat $VOLUME_PROPERTY`:/opt/varnish"
-    port="`cat $PORT_PROPERTY`"
-
-    # Launch container
-    debug "Launching $VARNISH_IMAGE: docker run -e CACHE_SIZE=$VARNISH_CACHE_SIZE -e THROTTLE_LIMIT=$VARNISH_THROTTLE_LIMIT -e GRACE_TTL=$VARNISH_GRACE_TTL -e GRACE_MAX=$VARNISH_GRACE_MAX -e BACKEND_PORT_${APP_PORT}_TCP_ADDR=$LOCAL_IP -e BACKEND_ENV_PORT=$APP_PORT -v $volume -p $port:$VARNISH_PORT -d $VARNISH_IMAGE /bin/run.sh"
-    ID=$(docker run -e CACHE_SIZE=$VARNISH_CACHE_SIZE -e THROTTLE_LIMIT="$VARNISH_THROTTLE_LIMIT" -e GRACE_TTL="$VARNISH_GRACE_TTL" -e GRACE_MAX="$VARNISH_GRACE_MAX" -e BACKEND_PORT_${APP_PORT}_TCP_ADDR=$LOCAL_IP -e BACKEND_ENV_PORT=$APP_PORT -v $volume -p $port:$VARNISH_PORT -d $VARNISH_IMAGE /bin/run.sh)
-    sleep 1
-    debug "Started $VARNISH_IMAGE"
-  fi
-fi
+dokku_log_info1 "Varnish post-deploy for $APP"
 
 pluginhook nginx-pre-reload $APP $PORT
 sudo /etc/init.d/nginx reload > /dev/null
