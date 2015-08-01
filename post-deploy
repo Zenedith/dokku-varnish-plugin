@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Notify an external service that a successful deploy has occurred.
+
+set -eo pipefail; [[ $DOKKU_TRACE ]] && set -x
+source "$(dirname $0)/../../../dokku/plugins/common/functions"
+
+APP="$1"
+PORT="$2"
+
+dokku_log_info1 "Varnish post-deploy for $APP"
+
+pluginhook nginx-pre-reload $APP $PORT
+sudo /etc/init.d/nginx reload > /dev/null

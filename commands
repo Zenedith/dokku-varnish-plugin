@@ -2,35 +2,46 @@
 
 set -eo pipefail; [[ $DOKKU_TRACE ]] && set -x
 
-# load common functions
-. $(dirname "$0")/functions
+C_DIR=$(dirname "$0")
+C_COMMAND="$1"
+C_APP="$2"
 
-check_required_params $1 $2
-init_vars
+function init() {
+  # load common functions
+  . $C_DIR/functions
+  check_required_params "$C_COMMAND" "$C_APP"
+  init_vars
+}
 
-case "$COMMAND" in
+case "$C_COMMAND" in
 
   varnish:create)
+    init
     varnish_create
   ;;
 
   varnish:delete)
+    init
     varnish_delete
   ;;
 
   varnish:info)
+    init
     varnish_info
   ;;
 
   varnish:logs)
+    init
     varnish_logs
   ;;
 
   varnish:list)
+    init
     varnish_list
   ;;
 
   help | varnish:help)
+    init
     cat && cat | print_help
   ;;
 

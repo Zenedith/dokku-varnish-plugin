@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Runs a command to ensure that an app's varnish installation is removed
+
+set -eo pipefail; [[ $DOKKU_TRACE ]] && set -x
+
+APP="$1";
+
+dokku varnish:delete $APP
