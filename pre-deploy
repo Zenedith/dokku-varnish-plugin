@@ -1,6 +1,7 @@
 #!/bin/bash
 
 set -eo pipefail; [[ $DOKKU_TRACE ]] && set -x
+source "$(dirname $0)/../../../dokku/plugins/common/functions"
 
 # load common functions
 . $(dirname "$0")/functions

@@ -1,6 +1,7 @@
 #!/bin/bash
 
 set -eo pipefail; [[ $DOKKU_TRACE ]] && set -x
+source "$(dirname $0)/../../../dokku/plugins/common/functions"
 
 # Const variables
 LOCAL_IP="172.17.42.1"
