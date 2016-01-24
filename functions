@@ -1,7 +1,10 @@
 #!/bin/bash
 
 set -eo pipefail; [[ $DOKKU_TRACE ]] && set -x
-source "$(dirname $0)/../../../dokku/plugins/common/functions"
+source "$PLUGIN_CORE_AVAILABLE_PATH/common/functions"
+source "$PLUGIN_AVAILABLE_PATH/certs/functions"
+source "$PLUGIN_AVAILABLE_PATH/config/functions"
+source "$PLUGIN_AVAILABLE_PATH/domains/functions"
 
 # Const variables
 LOCAL_IP="172.17.42.1"
@@ -15,6 +18,8 @@ VARNISH_IMAGE=
 VARNISH_DIR=
 
 PORT_PROPERTY=
+VARNISH_PORT_PROPERTY=
+VARNISH_IP_PROPERTY=
 CACHE_SIZE_PROPERTY=
 THROTTLE_LIMIT_PROPERTY=
 GRACE_TTL_PROPERTY=
@@ -126,6 +131,9 @@ function init_app_vars() {
 
   VARNISH_IMAGE="varnish/$APP"
   PORT_PROPERTY="$VARNISH_DIR/$APP/port"
+  VARNISH_IP_PROPERTY="$VARNISH_DIR/$APP/varnish_ip"
+  VARNISH_PORT_PROPERTY="$VARNISH_DIR/$APP/varnish_port"
+  VARNISH_BACKEND_IP_PROPERTY="$VARNISH_DIR/$APP/backend_ip"
   CACHE_SIZE_PROPERTY="$VARNISH_DIR/$APP/cache_size"
   THROTTLE_LIMIT_PROPERTY="$VARNISH_DIR/$APP/throttle_limit"
   GRACE_TTL_PROPERTY="$VARNISH_DIR/$APP/grace_ttl"
@@ -165,16 +173,19 @@ function init_app_vars() {
 
   echo $VARNISH_GRACE_MAX > "$GRACE_MAX_PROPERTY"
 
-  APP_CONTAINER=$(get_app_running_container_ids $APP)
+  if (is_deployed "$APP"); then
 
-  if [ -z "$APP_CONTAINER" ]; then
-    dokku_log_fail "Can't find application \"dokku/$APP\" container"
-  fi
+    APP_CONTAINER=$(get_app_running_container_ids $APP)
 
-  APP_PORT=$(docker port $APP_CONTAINER 5000 | sed 's/0.0.0.0://')
+    if [ ! -z "$APP_CONTAINER" ]; then
+      LOCAL_IP=$(docker inspect --format '{{ .NetworkSettings.IPAddress }}' $APP_CONTAINER)
 
-  if [ -z "$APP_PORT" ]; then
-    dokku_log_fail "Can't find port for application \"dokku/$APP\" on port 5000"
+      APP_PORT=$(echo $(docker inspect --format '{{ .Config.Env }}' ae0237770aa2d4469d9806b15f5f11464978e293117ffe219e19288e5ee04724 2> /dev/null || echo "PORT=5000") | tr ' ' '\n' | grep PORT | sed 's@^.*=@@')
+
+      if [ -z "$APP_PORT" ]; then
+        dokku_log_fail "Can't find port for application \"dokku/$APP\" on port 5000"
+      fi
+    fi
   fi
 }
 
@@ -188,20 +199,22 @@ function varnish_create() {
   check_varnish_image "$IMAGE"
 
   # Fork varnish image
-  ID=$(docker run -d "$DOCKER_VARNISH_IMAGE" `echo ''`)
+  ID=$(docker run -d "$DOCKER_VARNISH_IMAGE" "/bin/ls")
   docker wait $ID > /dev/null
   IMAGE=$(docker commit $ID)
   docker tag -f "$IMAGE" "$VARNISH_IMAGE"
 
   # Launch container
-
   ID=$(docker run -e LISTEN_PORT="$VARNISH_PORT" -e CACHE_SIZE="$VARNISH_CACHE_SIZE" -e THROTTLE_LIMIT="$VARNISH_THROTTLE_LIMIT" -e GRACE_TTL="$VARNISH_GRACE_TTL" -e GRACE_MAX="$VARNISH_GRACE_MAX" -e BACKEND_PORT_${APP_PORT}_TCP_ADDR="$LOCAL_IP" -e BACKEND_ENV_PORT="$APP_PORT" -p $VARNISH_PORT -d $VARNISH_IMAGE /bin/run.sh)
   sleep 4
 
   # Write port for further usage
-
   PORT=$(docker port $ID $VARNISH_PORT | sed 's/0.0.0.0://')
+  VARNISH_IP=$(docker inspect --format '{{ .NetworkSettings.IPAddress }}' $ID)
   echo $PORT > "$PORT_PROPERTY"
+  echo $VARNISH_PORT > "$VARNISH_PORT_PROPERTY"
+  echo $VARNISH_IP > "$VARNISH_IP_PROPERTY"
+  echo $LOCAL_IP > "$VARNISH_BACKEND_IP_PROPERTY"
 
   dokku_log_verbose "Varnish container created: $VARNISH_IMAGE"
   sleep 1
@@ -211,7 +224,7 @@ function varnish_create() {
 
   dokku_log_verbose "Set nginx to use varnish"
 
-  pluginhook post-deploy $APP $PORT
+  is_deployed "$APP" && dokku nginx:build-config "$APP" "$VARNISH_PORT" "$VARNISH_IP"
   dokku varnish:info $APP
 }
 
@@ -220,14 +233,16 @@ function varnish_info() {
   dokku_log_info1 "Varnish dokku_log_info1 for $APP"
   check_varnish_container
   local port=$(cat "$PORT_PROPERTY")
+  local varnish_port=$(cat "$VARNISH_PORT_PROPERTY")
+  local ip=$(cat "$VARNISH_IP_PROPERTY")
   local cache_size=$(cat "$CACHE_SIZE_PROPERTY")
   local throttle_limit=$(cat "$THROTTLE_LIMIT_PROPERTY")
   local grace_ttl=$(cat "$GRACE_TTL_PROPERTY")
   local grace_max=$(cat "$GRACE_MAX_PROPERTY")
 
   echo
-  echo "       Host: $LOCAL_IP"
-  echo "       Port: $port"
+  echo "       Host: $ip"
+  echo "       Port: $varnish_port => $port"
   echo
   echo "       Backend IP: $LOCAL_IP"
   echo "       Backend Port: $APP_PORT"
@@ -239,7 +254,7 @@ function varnish_info() {
 }
 
 function get_varnish_id() {
-  ID=$(docker ps -a | grep "$VARNISH_IMAGE":latest | awk '{print $1}')
+  ID=$(docker ps -a | grep "$VARNISH_IMAGE" | awk '{print $1}' | head -n 1)
   echo $ID
 }
 
@@ -254,7 +269,7 @@ function varnish_list() {
   echo
   dokku_log_info1 "List varnish instances"
   check_varnish_dir
-  CONTAINERS=$(ls $VARNISH_DIR/2> /dev/null | sed -e 's/_/ /')
+  CONTAINERS=$(ls $VARNISH_DIR/ 2> /dev/null | sed -e 's/_/ /')
   if [[ -z $CONTAINERS ]]; then
     dokku_log_fail "There are no Varnish containers created."
   else
@@ -268,8 +283,9 @@ function varnish_list() {
 function varnish_delete() {
   echo
   dokku_log_info1 "Delete varnish for $APP"
-  dokku_log_info1 "Restore nginx server port to $APP_PORT"
-  pluginhook post-deploy $APP $APP_PORT
+  dokku_log_info1 "Restore nginx server port to $APP_PORT and IP $LOCAL_IP"
+  is_deployed "$APP" && dokku nginx:build-config "$APP" "$APP_PORT" "$LOCAL_IP"
+
 
   ID=$(get_varnish_id)
 
@@ -290,6 +306,21 @@ function varnish_delete() {
   # Remove container port storage
   if [[ -f "$PORT_PROPERTY" ]]; then
     rm -f "$PORT_PROPERTY"
+  fi
+
+  # Remove container external port storage
+  if [[ -f "$VARNISH_PORT_PROPERTY" ]]; then
+    rm -f "$VARNISH_PORT_PROPERTY"
+  fi
+
+  # Remove backend IP storage
+  if [[ -f "$VARNISH_BACKEND_IP_PROPERTY" ]]; then
+    rm -f "$VARNISH_BACKEND_IP_PROPERTY"
+  fi
+
+  # Remove container IP storage
+  if [[ -f "$VARNISH_IP_PROPERTY" ]]; then
+    rm -f "$VARNISH_IP_PROPERTY"
   fi
 
   # Remove cache size property
